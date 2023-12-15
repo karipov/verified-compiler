@@ -1,5 +1,5 @@
 import VerifiedCompiler.Asm
-import VerifiedCompiler.Ast
+import VerifiedCompiler.Compile
 
 open Directive Operand Register Expr
 
@@ -27,4 +27,10 @@ def processDirective (st : ProcessorState) : Directive → ProcessorState
 def Processor.evalToState : List Directive → ProcessorState :=
 List.foldl processDirective {rax := 0}
 
-def Processor.eval (ds : List Directive) : Nat := (evalToState ds).rax
+def Processor.eval (ds : List Directive) : Nat ⊕ Bool :=
+let retval := (evalToState ds).rax;
+if retval &&& num_mask = num_tag then
+  Sum.inl (retval >>> num_shift)
+else if retval &&& bool_mask = bool_tag then
+  if retval >>> bool_shift = 0 then Sum.inr false else Sum.inr true
+else Sum.inl 0
