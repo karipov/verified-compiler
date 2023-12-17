@@ -16,3 +16,6 @@ def interpret_expr : Expr → Value
 | Sub1 e =>
   match (interpret_expr e) with
   | Integer i => Integer (i - 1)
+| Expr.Add e1 e2 =>
+  match (interpret_expr e1, interpret_expr e2) with
+  | (Integer i1, Integer i2) => Integer (i1 + i2)
