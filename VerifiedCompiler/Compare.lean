@@ -2,8 +2,6 @@ import VerifiedCompiler.Process
 import VerifiedCompiler.Compile
 import VerifiedCompiler.Interpret
 
-import VerifiedCompiler.LoVelib
-
 open Value Expr
 
 def Processor.evalToValue (ds : List Directive) : Value :=
@@ -14,7 +12,7 @@ theorem correctness :
   | Expr.Num n =>
     by
       simp [Processor.evalToValue, Processor.eval, Processor.evalToState,
-      processDirective, ProcessorState.setReg, ProcessorState.opVal, interpret_expr]
+      compile_expr, processDirective, ProcessorState.setReg, ProcessorState.opVal, interpret_expr]
 
   | Expr.Sub1 e =>
     by
@@ -23,10 +21,7 @@ theorem correctness :
       rw [←ih]
       simp
       rw [compile_expr]
-      have hfold_concat :=
-        List.foldl_concat processDirective { rax := 0 }
-          (Directive.Sub (Operand.Reg Register.Rax, Operand.Imm 1)) (compile_expr e)
-      rw [hfold_concat]
+      rw [List.foldl_append]
       rfl
 
   | Expr.Add1 e =>
@@ -36,7 +31,5 @@ theorem correctness :
       rw [←ih]
       simp
       rw [compile_expr]
-      have hfold_concat := List.foldl_concat processDirective { rax := 0 }
-          (Directive.Add (Operand.Reg Register.Rax, Operand.Imm 1)) (compile_expr e)
-      rw [hfold_concat]
+      rw [List.foldl_append]
       rfl
