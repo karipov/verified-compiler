@@ -61,6 +61,14 @@ I also thought about extending the AST to support an operation like `(Add 1 2)`.
 In Lean4, I modeled the stack as a list, with `push` and `pop` operations. This required extending the processor behavior for these functions, and more. This prove has been difficuilt, but some progress is being made!
 
 
+## Update (October 2026)
+
+- The project now builds with Lean `v4.34.1` and no longer depends on Mathlib. None of the proofs needed it, so `LoVelib.lean` is gone too, and `lake build` takes a few seconds.
+- **`booleans`** is finished. The induction goes through a stronger lemma, `compile_expr_rax`: whenever the interpreter produces a value, the compiled code leaves that value's *tagged encoding* in `rax`. Then `evalToValue_encode` shows that untagging gives the value back. (The helper `smth` is now `n * 2 ^ sh >>> sh = n`; the old `n * sh ^ 2` version wasn't true, e.g. for `n = sh = 1`.)
+- **`add-two`** is finished, but it needed a fix first: the `Pop` operand read the top of the stack without removing it, so nested additions read stale values, and `Add (Num 1) (Add (Num 2) (Num 3))` compiled to 7. `Pop` is now a directive that pops into a register (`push rax; ...; pop rcx; add rax, rcx`). The proof generalizes over the starting state (`compile_expr_spec`): from *any* state, the code for `e` leaves its value in `rax` and leaves the stack the way it found it.
+- **`extended`** combines both branches and adds `Sub`, `IsZero`, `Lt` and `If`. `If` needs jumps, so the processor runs code with `Processor.run` instead of `List.foldl`. Jumps are relative ("skip the next `n` directives"), and since the language has no loops they only ever go forwards. The main lemma, `compile_expr_spec`, says that running the code for `e` followed by any `rest` is the same as running `rest` from a state with `e`'s encoding in `rax` and the original stack. That's what shows every jump lands where it should.
+
+
 ## Resources
 
 These have been invaluable as I have worked on this project. I borrowed heavily from Rob's work in our compilers class.
