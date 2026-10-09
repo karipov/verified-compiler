@@ -2,8 +2,6 @@ import VerifiedCompiler.Process
 import VerifiedCompiler.Compile
 import VerifiedCompiler.Interpret
 
-import VerifiedCompiler.LoVelib
-
 open Value Expr Directive Register Operand
 
 @[simp] def Processor.evalToValue (ds : List Directive) : Value :=
@@ -16,66 +14,59 @@ theorem moving
     (eval_push : Processor.evalToState (compile_expr prog ++ [Push (Reg Rax)]) = st_push)
     : st_push = { st_nopush with stack := st_push.rax :: st_nopush.stack }
     :=
-    by sorry
+    by
+      subst eval_nopush eval_push
+      simp [List.foldl_append, processDirective, ProcessorState.stackPush,
+        ProcessorState.opVal, ProcessorState.regVal]
 
 
-#check List.foldl_append
+-- `correctness` only talks about running code from the empty starting state, but in
+-- `Add e₁ e₂` the code for `e₂` runs with `e₁`'s value already pushed on the stack. so the
+-- induction needs a stronger statement that works from *any* starting state: the code for
+-- `prog` leaves its value in rax, and leaves the stack exactly the way it found it.
+theorem compile_expr_spec :
+  ∀ (prog : Expr) (st : ProcessorState),
+    Integer (List.foldl processDirective st (compile_expr prog)).rax = interpret_expr prog ∧
+    (List.foldl processDirective st (compile_expr prog)).stack = st.stack
+  | Expr.Num n, st =>
+    by
+      simp [compile_expr, interpret_expr, processDirective, ProcessorState.setReg,
+        ProcessorState.opVal]
+
+  | Expr.Sub1 e, st =>
+    by
+      have ⟨ih_rax, ih_stack⟩ := compile_expr_spec e st
+      simp only [compile_expr, interpret_expr, List.foldl_append, ← ih_rax]
+      simp [processDirective, ProcessorState.setReg, ProcessorState.regVal,
+        ProcessorState.opVal, ih_stack]
+
+  | Expr.Add1 e, st =>
+    by
+      have ⟨ih_rax, ih_stack⟩ := compile_expr_spec e st
+      simp only [compile_expr, interpret_expr, List.foldl_append, ← ih_rax]
+      simp [processDirective, ProcessorState.setReg, ProcessorState.regVal,
+        ProcessorState.opVal, ih_stack]
+
+  | Expr.Add e₁ e₂, st =>
+    by
+      simp only [compile_expr, interpret_expr, List.foldl_append, List.foldl_cons,
+        List.foldl_nil]
+      -- st₁: the state after running the code for e₁ from st
+      have ⟨ih₁_rax, ih₁_stack⟩ := compile_expr_spec e₁ st
+      generalize List.foldl processDirective st (compile_expr e₁) = st₁ at *
+      -- st₂: the state after pushing e₁'s value and running the code for e₂ from there
+      have ⟨ih₂_rax, ih₂_stack⟩ := compile_expr_spec e₂ (processDirective st₁ (Push (Reg Rax)))
+      generalize List.foldl processDirective (processDirective st₁ (Push (Reg Rax)))
+        (compile_expr e₂) = st₂ at *
+      -- so e₁'s value is sitting on top of the original stack...
+      simp only [processDirective, ProcessorState.stackPush, ProcessorState.opVal,
+        ProcessorState.regVal, ih₁_stack] at ih₂_stack
+      -- ...and popping it into rcx and adding it to e₂'s value gives the right answer
+      rw [← ih₁_rax, ← ih₂_rax]
+      simp [processDirective, ProcessorState.stackPop, ih₂_stack, ProcessorState.setReg,
+        ProcessorState.regVal, ProcessorState.opVal, Nat.add_comm]
+
 
 theorem correctness :
-  ∀ prog : Expr, Processor.evalToValue (compile_expr prog) = interpret_expr prog
-  | Expr.Num n =>
-    by
-      simp [Processor.evalToValue, Processor.eval, Processor.evalToState,
-      processDirective, ProcessorState.setReg, ProcessorState.opVal, interpret_expr]
-
-  | Expr.Sub1 e =>
-    by
-      have ih := correctness e
-      simp [Processor.evalToValue, Processor.eval, Processor.evalToState, interpret_expr] at *
-      rw [←ih]
-      simp
-      rw [compile_expr]
-      cases (compile_expr e) with
-      | nil => simp
-      | cons hd tl =>
-        have hfold_concat :=
-          List.foldl_concat processDirective { rax := 0, rcx := 0, stack := [] }
-            (Directive.Sub (Operand.Reg Register.Rax, Operand.Imm 1)) (hd :: tl)
-        rw [hfold_concat]
-        rfl
-
-  | Expr.Add1 e =>
-    by
-      have ih := correctness e
-      simp [Processor.evalToValue, Processor.eval, Processor.evalToState, interpret_expr] at *
-      rw [←ih]
-      simp
-      rw [compile_expr]
-      cases (compile_expr e) with
-      | nil => simp
-      | cons hd tl =>
-        have hfold_concat := List.foldl_concat processDirective { rax := 0, rcx := 0, stack := [] }
-            (Directive.Add (Operand.Reg Register.Rax, Operand.Imm 1)) (hd :: tl)
-        rw [hfold_concat]
-        rfl
-  | Expr.Add e₁ e₂ =>
-    by
-      have ih₁ := correctness e₁
-      have ih₂ := correctness e₂
-      simp [interpret_expr] at *
-      rw [←ih₁, ←ih₂]
-      simp
-      rw [compile_expr]
-
-      have smth := moving e₁ (Processor.evalToState (compile_expr e₁))
-                            (Processor.evalToState (compile_expr e₁ ++ [Push (Reg Rax)]))
-                            (by rfl) (by rfl)
-      simp only [Processor.evalToState] at smth
-      have llsee := List.foldl_append processDirective { rax := 0, rcx := 0, stack := [] } (compile_expr e₁ ++ [Push (Reg Rax)]) (compile_expr e₂ ++ [Add (Reg Rax, Pop)])
-      have heq : (compile_expr e₁ ++ [Push (Reg Rax)]) ++ (compile_expr e₂ ++ [Add (Reg Rax, Pop)])
-                = compile_expr e₁ ++ [Push (Reg Rax)] ++ compile_expr e₂ ++ [Add (Reg Rax, Pop)] := by simp
-      rw [heq] at llsee
-      rw [llsee]
-      rw [smth]
-
-      sorry
+  ∀ prog : Expr, Processor.evalToValue (compile_expr prog) = interpret_expr prog :=
+  fun prog => (compile_expr_spec prog { rax := 0, rcx := 0, stack := [] }).1

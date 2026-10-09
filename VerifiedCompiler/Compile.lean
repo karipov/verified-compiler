@@ -14,4 +14,4 @@ def compile_expr : Expr → List Directive
   compile_expr e₁
   ++ [ Push (Reg Rax) ]
   ++ compile_expr e₂
-  ++ [ Add (Reg Rax, Pop) ]
+  ++ [ Pop Rcx, Add (Reg Rax, Reg Rcx) ]
