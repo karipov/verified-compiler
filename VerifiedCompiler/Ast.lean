@@ -1,4 +1,10 @@
 inductive Expr
 | Num (n : Nat)
+| Bool (b : Bool)
 | Add1 (e : Expr)
 | Sub1 (e : Expr)
+| Add (e₁ : Expr) (e₂ : Expr)
+| Sub (e₁ : Expr) (e₂ : Expr)
+| IsZero (e : Expr)
+| Lt (e₁ : Expr) (e₂ : Expr)
+| If (c : Expr) (t : Expr) (f : Expr)
