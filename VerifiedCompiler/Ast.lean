@@ -8,3 +8,11 @@ inductive Expr
 | IsZero (e : Expr)
 | Lt (e₁ : Expr) (e₂ : Expr)
 | If (c : Expr) (t : Expr) (f : Expr)
+| Not (e : Expr)
+| Eq (e₁ : Expr) (e₂ : Expr)
+| And (e₁ : Expr) (e₂ : Expr)
+| Or (e₁ : Expr) (e₂ : Expr)
+| IsNum (e : Expr)   -- `num?`
+| IsBool (e : Expr)  -- `bool?`
+| Var (x : String)
+| Let (x : String) (e : Expr) (body : Expr)
