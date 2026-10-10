@@ -1,4 +1,5 @@
 import VerifiedCompiler.Compare
+import VerifiedCompiler.Parse
 
 open Expr Value
 
@@ -63,3 +64,23 @@ def defs : List Defn := [fact, mul, range, sum, loop]
 #guard runCompiled defs (Expr.Eq (Add1 (Num 2)) (Num 3)) == .done (Boolean true)
 #guard runCompiled defs (IsNum (Expr.Bool true)) == .done (Boolean false)
 #guard runCompiled defs (IsPair (Expr.Pair (Num 1) (Num 2))) == .done (Boolean true)
+
+-- the same programs, written as s-expressions
+def runSource (src : String) (fuel : Nat := 1000) : String :=
+  match parseProgram src with
+  | .ok prog => (Processor.evalToValue fuel (compile prog)).toString
+  | .error e => s!"parse error: {e}"
+
+#guard runSource "
+  (define (mul a b) (if (zero? a) 0 (+ b (mul (sub1 a) b))))
+  (define (fact n) (if (zero? n) 1 (mul n (fact (sub1 n)))))
+  (fact 5)" == "120"
+#guard runSource "(let ((p (pair 1 (pair true 3)))) (right p))" == "(pair true 3)"
+#guard runSource "(add1 true)" == "error"
+#guard runSource "(define (loop x) (loop x)) (loop 1)" == "timeout"
+#guard runSource "(add1 1 2)" == "parse error: bad `add1` expression"
+
+-- printing a program and parsing it again gives the same program
+#guard match (parseProgram (Program.toString ⟨defs, App "sum" [App "range" [Num 3]]⟩)) with
+  | .ok p => p == ⟨defs, App "sum" [App "range" [Num 3]]⟩
+  | .error _ => false
