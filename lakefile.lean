@@ -7,3 +7,7 @@ package «verified-compiler» where
 @[default_target]
 lean_lib VerifiedCompiler where
   globs := #[Glob.submodules `VerifiedCompiler]
+
+-- `lake exe vc (run | model | asm) FILE`
+lean_exe vc where
+  root := `Main
